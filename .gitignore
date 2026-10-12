@@ -1,0 +1,5 @@
+# Hanya situs yang dilacak; slide, kuis, dan file kerja tetap lokal
+/*
+!/.gitignore
+!/README.md
+!/index.html
