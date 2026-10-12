@@ -9617,7 +9617,7 @@ function pageBab(b,mode){
     view.appendChild(akordeon(cards,{lanjut:true,pertama:true}));
     var pp=D.poin[b.id];
     if(pp){var pb=h('div','card poin');pb.appendChild(h('div','eyebrow','Penutup bab'));pb.appendChild(h('h2',null,'Poin penting Bab '+b.id));
-      var ul=h('ol');pp.forEach(function(x){ul.appendChild(h('li',null,x))});pb.appendChild(ul);view.appendChild(pb)}
+      var ul=h('ol');pp.forEach(function(x){ul.appendChild(h('li',null,'<span>'+x+'</span>'))});pb.appendChild(ul);view.appendChild(pb)}
     var a=h('div','aksi');var k1=h('a','btn','Kerjakan kuis bab ini');k1.href='#bab'+b.id+'-kuis';a.appendChild(k1);view.appendChild(a);
   }else{
     src=tpl('tpl-bab'+b.id);
