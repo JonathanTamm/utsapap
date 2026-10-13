@@ -11090,25 +11090,37 @@ function pageUTS(){
   function sisa(){return Math.round(UTS_MENIT*60-(Date.now()-st.start)/1000)}
   function fmt(s){if(s<0)s=0;var j=Math.floor(s/3600),m=Math.floor(s%3600/60),d=s%60;return j+':'+('0'+m).slice(-2)+':'+('0'+d).slice(-2)}
   function save(){LS.set(KEY_SIM,st)}
+  var KEY_SEEN='apap-uts-seen';
+  function riwayat(){var s=LS.get(KEY_SEEN,null);return (s&&s.v===D.uts.v)?s:{v:D.uts.v,pg:[],es:[]}}
+  function catatRiwayat(){
+    var s=riwayat();
+    st.pg.forEach(function(bi){var no=BANK[bi].no;if(s.pg.indexOf(no)<0)s.pg.push(no)});
+    st.es.forEach(function(ei){var id=ES[ei].id;if(s.es.indexOf(id)<0)s.es.push(id)});
+    if(s.pg.length>=BANK.length)s.pg=[];
+    if(s.es.length>=ES.length)s.es=[];
+    LS.set(KEY_SEEN,s);
+  }
+  function bisaSimpan(){try{localStorage.setItem('apap-tes','1');var ok=localStorage.getItem('apap-tes')==='1';localStorage.removeItem('apap-tes');return ok}catch(e){return false}}
   function acak(a){var o=shuffle(a.length);return o.map(function(i){return a[i]})}
   function pilihPG(){
-    var per={},out=[],sisaPool=[];
-    BANK.forEach(function(x,i){(per[x.topik]=per[x.topik]||[]).push(i)});
-    var dasar=Math.floor(N_PG/Object.keys(per).length);
-    Object.keys(per).forEach(function(t){
-      var a=acak(per[t]);a.sort(function(p,q){return (BANK[q].p0?1:0)-(BANK[p].p0?1:0)});
-      out=out.concat(a.slice(0,dasar));sisaPool=sisaPool.concat(a.slice(dasar));
-    });
-    return acak(out.concat(acak(sisaPool).slice(0,Math.max(0,N_PG-out.length))));
+    // Soal yang belum pernah dikerjakan selalu didahulukan; pemerataan per topik hanya di antara soal baru.
+    var lama=riwayat().pg,per={},out=[],sisaBaru=[],sudah=[];
+    BANK.forEach(function(x,i){if(lama.indexOf(x.no)>=0)sudah.push(i);else (per[x.topik]=per[x.topik]||[]).push(i)});
+    var dasar=Math.floor(N_PG/TP.length);
+    Object.keys(per).forEach(function(t){var a=acak(per[t]);out=out.concat(a.slice(0,dasar));sisaBaru=sisaBaru.concat(a.slice(dasar))});
+    out=out.concat(acak(sisaBaru).slice(0,Math.max(0,N_PG-out.length)));
+    out=out.concat(acak(sudah).slice(0,Math.max(0,N_PG-out.length)));
+    return acak(out);
   }
   function pilihEsai(){
-    function dari(b,n){var a=[];ES.forEach(function(x,i){if(x.bagian===b)a.push(i)});return acak(a).slice(0,n)}
+    var lamaE=riwayat().es;function pernahE(i){return lamaE.indexOf(ES[i].id)>=0?1:0}
+    function dari(b,n){var a=[];ES.forEach(function(x,i){if(x.bagian===b)a.push(i)});a=acak(a);a.sort(function(p,q){return pernahE(p)-pernahE(q)});return a.slice(0,n)}
     var e=dari('B',2).concat(dari('C',2)).concat(dari('G',1));
     if(e.length<5){var lain=[];ES.forEach(function(_,i){if(e.indexOf(i)<0)lain.push(i)});e=e.concat(acak(lain).slice(0,5-e.length))}
     return e;
   }
   function mulai(){var pg=pilihPG();st={v:D.uts.v,start:Date.now(),pg:pg,opt:pg.map(function(i){return shuffle(BANK[i].opts.length)}),es:pilihEsai(),ans:{},teks:{},diri:{},done:false,pakai:0};save();draw();atas()}
-  function kumpul(){st.done=true;st.pakai=Math.min(UTS_MENIT*60,Math.round((Date.now()-st.start)/1000));save();if(timer){clearInterval(timer);timer=null}draw();atas()}
+  function kumpul(){if(!st.done)catatRiwayat();st.done=true;st.pakai=Math.min(UTS_MENIT*60,Math.round((Date.now()-st.start)/1000));save();if(timer){clearInterval(timer);timer=null}draw();atas()}
   function head(){view.appendChild(h('div','eyebrow','Soal dari Latihan Soal Asistensi UTS &middot; '+N_PG+' pilihan ganda + 5 esai &middot; 150 menit'));view.appendChild(h('h1',null,'Simulasi UTS'))}
   function klikNav(e){var g=e.target.dataset&&e.target.dataset.go;if(g){e.preventDefault();goTo(document.getElementById(g))}}
   function namaTopik(t){var x=TP.filter(function(y){return y.id===t})[0];return x?x.nama:'Topik '+t}
@@ -11123,18 +11135,27 @@ function pageUTS(){
         'Format mengikuti dokumen asdos: Bagian A pilihan ganda, lalu esai penjelasan kode dan esai coding konseptual. Tidak ada isian singkat.',
         'Pilihan ganda diambil merata dari sepuluh topik di dokumen asdos, termasuk Clean Coding, Testing, dan Performance Testing.',
         'Nilai: pilihan ganda '+P_PG+' poin per soal (total '+(N_PG*P_PG)+'), esai '+P_ES+' poin per soal (total 40) yang kamu nilai sendiri dengan membandingkan jawabanmu dengan jawaban model.',
-        'Waktu 2 jam 30 menit dan terus berjalan walaupun halaman ditutup. Jawaban tersimpan otomatis di browser ini, dan terkumpul otomatis saat waktu habis.'];
+        'Waktu 2 jam 30 menit dan terus berjalan walaupun halaman ditutup. Jawaban terkumpul otomatis saat waktu habis.',
+        'Setiap jawaban langsung tersimpan di browser ini. Bila halaman dimuat ulang atau ditutup lalu dibuka lagi, simulasi berlanjut dengan soal, urutan, dan jawaban yang sama.',
+        'Soal yang sudah pernah kamu kerjakan tidak diulang di simulasi berikutnya sampai seluruh bank soal habis.'];
       var ul0=h('ul','rapi');aturan.forEach(function(x){ul0.appendChild(h('li',null,x))});
       var kotak=h('div','card pad');kotak.appendChild(ul0);view.appendChild(kotak);
       view.appendChild(h('p','note','Dokumen asdos tidak menyertakan kunci jawaban. Kunci dan pembahasan di sini disusun dari materi kuliah, bukan kunci resmi; bobot nilai juga perkiraan.'));
-      var a=h('div','aksi');var b=h('button','btn','Mulai simulasi');b.onclick=mulai;a.appendChild(b);view.appendChild(a);return;
+      var rw=riwayat();
+      if(!bisaSimpan())view.appendChild(h('p','peringatan','Browser ini memblokir penyimpanan (misalnya mode penyamaran yang ketat). Jawaban tidak akan bertahan bila halaman dimuat ulang.'));
+      var a=h('div','aksi');var b=h('button','btn','Mulai simulasi');b.onclick=mulai;a.appendChild(b);
+      if(rw.pg.length||rw.es.length){
+        view.appendChild(h('p','note','Kamu sudah pernah mengerjakan '+rw.pg.length+' dari '+BANK.length+' pilihan ganda dan '+rw.es.length+' dari '+ES.length+' esai. Simulasi berikutnya mendahulukan soal yang belum pernah muncul.'));
+        var rs=h('button','btn sek','Lupakan riwayat soal');rs.onclick=function(){LS.del(KEY_SEEN);draw()};a.appendChild(rs);
+      }
+      view.appendChild(a);return;
     }
     if(!st.done&&sisa()<=0){kumpul();return}
     head();
     if(st.done){hasil();return}
     var total=st.pg.length+st.es.length;
     var bar=h('div','bar');var jam=h('span','jam',fmt(sisa()));var cnt=h('span');var btn=h('button','btn','Kumpulkan');var msg=h('span','peringatan');
-    bar.appendChild(jam);bar.appendChild(cnt);bar.appendChild(msg);bar.appendChild(btn);view.appendChild(bar);
+    var smp=h('span',null,bisaSimpan()?'tersimpan otomatis':'penyimpanan diblokir browser');bar.appendChild(jam);bar.appendChild(cnt);bar.appendChild(smp);bar.appendChild(msg);bar.appendChild(btn);view.appendChild(bar);
     var ns=h('div','navsoal');view.appendChild(ns);
     function ada(i){return i<st.pg.length?st.ans[i]!=null:!!(st.teks[i-st.pg.length]||'').trim()}
     function upd(){var n=0,html='';for(var i=0;i<total;i++){var a=ada(i);if(a)n++;html+='<a href="#" data-go="u-'+(i+1)+'" class="'+(a?'ada':'')+'">'+(i+1)+'</a>'}
